@@ -1,11 +1,9 @@
 name: Build and Deploy Python App to EC2
-
-    on:
+on:
       push:
         branches:
           - main
-
-    jobs:
+jobs:
       build-and-push:
         runs-on: ubuntu-latest
 
