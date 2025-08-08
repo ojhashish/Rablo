@@ -28,8 +28,8 @@ name: Build and Deploy Python App to EC2
               docker push ${{ secrets.DOCKER_USERNAME }}/python-app:latest
 
       deploy:
-        needs: build-and-push
-        runs-on: ubuntu-latest
+        needs: build-and-push 
+        runs-on: ubuntu-latest 
 
         steps:
           - name: Checkout code
@@ -62,10 +62,10 @@ name: Build and Deploy Python App to EC2
                 ssh -o StrictHostKeyChecking=no ec2-user@$host << 'EOF'
                   sudo systemctl start docker || sudo service docker start
                   echo "Docker service ensured."
-            
-                  echo "${{ env.DOCKER_PASSWORD }}" | docker login --username "${{$
+
+                  echo "${{ env.DOCKER_PASSWORD }}" | docker login --username "${{ env.DOCKER_USERNAME }}" --password-stdin
                   echo "Logged into Docker Hub on EC2."
-            
+
                   if [ $(docker ps -aq -f name=my-python-app) ]; then
                     echo "Stopping and removing old container..."
                     docker stop my-python-app || true
@@ -74,15 +74,15 @@ name: Build and Deploy Python App to EC2
                     echo "No existing container named 'my-python-app' found."
                   fi
 
-                  echo "Pulling latest Docker image: ${{ env.DOCKER_USERNAME }}/py$
+                  echo "Pulling latest Docker image: ${{ env.DOCKER_USERNAME }}/python-web-app:latest..."
                   docker pull "${{ env.DOCKER_USERNAME }}"/python-app:latest
                   echo "Image pulled successfully."
-                
+
                   echo "Starting new container..."
-                  docker run -d -p 80:80 --name my-python-app "${{ env.DOCKER_USER$
+                  docker run -d -p 80:80 --name my-python-app "${{ env.DOCKER_USERNAME }}"/python-web-app:latest
                   echo "New container started."
-          
-                  echo "ALB's health checks will now verify the new container's he$
-                  echo "Deployment and ALB health check readiness complete for $ho$
+
+                  echo "ALB's health checks will now verify the new container's health on this instance."
+                  echo "Deployment and ALB health check readiness complete for $host."
                 EOF
               done
