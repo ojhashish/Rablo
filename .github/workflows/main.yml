@@ -48,41 +48,43 @@ jobs:
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
         run: |
           # Define the deployment script to be run on EC2 instances
-          # This script is enclosed in single quotes to prevent early evaluation by the GitHub Actions runner
-          # It uses ${{ env.DOCKER_USERNAME }} and ${{ env.DOCKER_PASSWORD }} for Docker Hub login on EC2
-          # 'my-python-app' is the container name
-          DEPLOY_SCRIPT='
+          # IMPORTANT: For multi-line scripts passed via base64, ensure no backticks
+          # or other shell expansions within this string that aren't intended for the *remote* shell.
+          # The entire content should be treated as a literal string until decoded on the remote.
+          DEPLOY_SCRIPT_CONTENT="
             sudo systemctl start docker || sudo service docker start
-            echo "Docker service ensured."
+            echo 'Docker service ensured.'
 
-            echo "${{ env.DOCKER_PASSWORD }}" | docker login --username "${{ env.DOCKER_USERNAME }}" --password-stdin
-            echo "Logged into Docker Hub on EC2."
+            echo '${{ env.DOCKER_PASSWORD }}' | docker login --username '${{ env.DOCKER_USERNAME }}' --password-stdin
+            echo 'Logged into Docker Hub on EC2.'
 
-            if [ $(docker ps -aq -f name=my-python-app) ]; then
-              echo "Stopping and removing old container..."
+            if [ \$(docker ps -aq -f name=my-python-app) ]; then
+              echo 'Stopping and removing old container...'
               docker stop my-python-app || true
               docker rm my-python-app || true
             else
-              echo "No existing container named \'my-python-app\' found."
+              echo 'No existing container named \"my-python-app\" found.'
             fi
 
-            echo "Pulling latest Docker image: ${{ env.DOCKER_USERNAME }}/python-app:latest..."
-            docker pull "${{ env.DOCKER_USERNAME }}"/python-app:latest
-            echo "Image pulled successfully."
+            echo 'Pulling latest Docker image: ${{ env.DOCKER_USERNAME }}/python-app:latest...'
+            docker pull '${{ env.DOCKER_USERNAME }}'/python-app:latest
+            echo 'Image pulled successfully.'
 
-            echo "Starting new container..."
-            docker run -d -p 80:80 --name my-python-app "${{ env.DOCKER_USERNAME }}"/python-app:latest
-            echo "New container started."
+            echo 'Starting new container...'
+            docker run -d -p 80:80 --name my-python-app '${{ env.DOCKER_USERNAME }}'/python-app:latest
+            echo 'New container started.'
 
-            echo "ALB\'s health checks will now verify the new container\'s health on this instance."
-            echo "Deployment and ALB health check readiness complete for $host."
-          '
+            echo 'ALB'\''s health checks will now verify the new container'\''s health on this instance.'
+            echo 'Deployment and ALB health check readiness complete for \$host.'
+          "
 
           # Loop through each EC2 host
           echo "${{ secrets.EC2_HOSTS }}" | tr ' ' '\n' | while read host; do
             echo "Initiating deployment to EC2 instance: $host..."
-            # Base64 encode the script and send it to the remote host via SSH
+            # Base64 encode the script content and send it to the remote host via SSH
             # The remote host decodes it and executes it using bash
-            ssh -o StrictHostKeyChecking=no ec2-user@$host "echo \"$DEPLOY_SCRIPT\" | base64 -D | bash"
+            # Using printf %s\\n to correctly handle newlines before base64 encoding
+            # Use 'bash -c' with single quotes to pass the entire command as one argument.
+            ssh -o StrictHostKeyChecking=no ec2-user@$host 'printf "%s" "$DEPLOY_SCRIPT_CONTENT" | base64 | base64 -d | bash'
             echo "Deployment to $host completed."
           done
