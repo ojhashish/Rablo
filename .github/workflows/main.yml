@@ -3,19 +3,23 @@ on:
   push:
     branches:
       - main
+
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
+
       - name: Login to Docker Hub
         uses: docker/login-action@v1
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
+
       - name: Build and push Docker image
         run: |
           docker build -t ${{ secrets.DOCKER_USERNAME }}/python-app:latest .
@@ -27,20 +31,24 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+
       - name: Set up SSH
         uses: webfactory/ssh-agent@v0.5.3
         with:
           ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
+
       - name: Install SSH client
         run: |
           sudo apt-get update
           sudo apt-get install -y openssh-client
+
       - name: Configure SSH known hosts
         run: |
           echo "${{ secrets.EC2_HOSTS }}" | tr ' ' '\n' | while read host; do
             ssh-keyscan $host >> ~/.ssh/known_hosts
           done
           chmod 600 ~/.ssh/known_hosts
+
       - name: Deploy to EC2 instances and ensure ALB mounting
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
@@ -48,7 +56,7 @@ jobs:
         run: |
           echo "${{ secrets.EC2_HOSTS }}" | tr ' ' '\n' | while read host; do
             echo "Initiating deployment to EC2 instance: $host..."
-            ssh -o StrictHostKeyChecking=no ec2-user@$host 'bash -s' <<'ENDSSH'
+            ssh -o StrictHostKeyChecking=no ec2-user@$host "DOCKER_USERNAME=${DOCKER_USERNAME} DOCKER_PASSWORD=${DOCKER_PASSWORD} bash -s" <<'ENDSSH'
 sudo systemctl start docker || sudo service docker start
 echo "Docker service ensured."
 echo "${DOCKER_PASSWORD}" | docker login --username "${DOCKER_USERNAME}" --password-stdin
