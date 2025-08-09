@@ -68,5 +68,3 @@ jobs:
               echo "New container started."
               echo "ALB's health checks will now verify the new container's health on this instance."
               echo "Deployment and ALB health check readiness complete for $host."
-               EOF
-               done
