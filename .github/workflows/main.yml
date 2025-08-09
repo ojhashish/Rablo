@@ -41,16 +41,11 @@ jobs:
             ssh-keyscan $host >> ~/.ssh/known_hosts;
           done
           chmod 600 ~/.ssh/known_hosts
-
       - name: Deploy to EC2 instances and ensure ALB "mounting"
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
         run: |
-          # Define the deployment script to be run on EC2 instances
-          # IMPORTANT: For multi-line scripts passed via base64, ensure no backticks
-          # or other shell expansions within this string that aren't intended for the *remote* shell.
-          # The entire content should be treated as a literal string until decoded on the remote.
           DEPLOY_SCRIPT_CONTENT="
             sudo systemctl start docker || sudo service docker start
             echo 'Docker service ensured.'
@@ -77,14 +72,8 @@ jobs:
             echo 'ALB'\''s health checks will now verify the new container'\''s health on this instance.'
             echo 'Deployment and ALB health check readiness complete for \$host.'
           "
-
-          # Loop through each EC2 host
           echo "${{ secrets.EC2_HOSTS }}" | tr ' ' '\n' | while read host; do
             echo "Initiating deployment to EC2 instance: $host..."
-            # Base64 encode the script content and send it to the remote host via SSH
-            # The remote host decodes it and executes it using bash
-            # Using printf %s\\n to correctly handle newlines before base64 encoding
-            # Use 'bash -c' with single quotes to pass the entire command as one argument.
             ssh -o StrictHostKeyChecking=no ec2-user@$host 'printf "%s" "$DEPLOY_SCRIPT_CONTENT" | base64 | base64 -d | bash'
             echo "Deployment to $host completed."
           done
