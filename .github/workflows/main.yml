@@ -48,12 +48,12 @@ jobs:
         run: |
           echo "${{ secrets.EC2_HOSTS }}" | tr ' ' '\n' | while read host; do
             echo "Initiating deployment to EC2 instance: $host..."
-            ssh -o StrictHostKeyChecking=no ec2-user@$host <<EOF
+            ssh -o StrictHostKeyChecking=no ec2-user@$host 'bash -s' <<'ENDSSH'
 sudo systemctl start docker || sudo service docker start
 echo "Docker service ensured."
 echo "${DOCKER_PASSWORD}" | docker login --username "${DOCKER_USERNAME}" --password-stdin
 echo "Logged into Docker Hub on EC2."
-if [ \$(docker ps -aq -f name=my-python-app) ]; then
+if [ $(docker ps -aq -f name=my-python-app) ]; then
   echo "Stopping and removing old container..."
   docker stop my-python-app || true
   docker rm my-python-app || true
@@ -68,6 +68,6 @@ docker run -d -p 80:80 --name my-python-app "${DOCKER_USERNAME}/python-app:lates
 echo "New container started."
 echo "ALB's health checks will now verify the new container's health on this instance."
 echo "Deployment and ALB health check readiness complete for $host."
-EOF
+ENDSSH
           done
 
